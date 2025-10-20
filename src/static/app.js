@@ -20,14 +20,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
-        // Формируем список участников
+        // Формируем список участников с иконкой удаления
         let participantsSection = "";
         if (details.participants && details.participants.length > 0) {
           participantsSection = `
             <div class="participants-section">
               <strong>Участники:</strong>
               <ul class="participants-list">
-                ${details.participants.map(email => `<li>${email}</li>`).join("")}
+                ${details.participants.map(email => `
+                  <li class="participant-item">
+                    <span class="participant-email">${email}</span>
+                    <button class="delete-participant-btn" title="Удалить" data-activity="${name}" data-email="${email}">
+                      <span class="delete-icon">&#128465;</span>
+                    </button>
+                  </li>
+                `).join("")}
               </ul>
             </div>
           `;
@@ -56,6 +63,38 @@ document.addEventListener("DOMContentLoaded", () => {
         option.textContent = name;
         activitySelect.appendChild(option);
       });
+
+      // Навесить обработчики на кнопки удаления участников
+      document.querySelectorAll(".delete-participant-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          const activity = btn.getAttribute("data-activity");
+          const email = btn.getAttribute("data-email");
+          if (confirm(`Удалить участника ${email} из "${activity}"?`)) {
+            try {
+              const response = await fetch(`/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(email)}`, {
+                method: "DELETE"
+              });
+              const result = await response.json();
+              if (response.ok) {
+                messageDiv.textContent = result.message;
+                messageDiv.className = "success";
+                fetchActivities();
+              } else {
+                messageDiv.textContent = result.detail || "Ошибка при удалении участника";
+                messageDiv.className = "error";
+              }
+              messageDiv.classList.remove("hidden");
+              setTimeout(() => messageDiv.classList.add("hidden"), 5000);
+            } catch (error) {
+              messageDiv.textContent = "Ошибка при удалении участника.";
+              messageDiv.className = "error";
+              messageDiv.classList.remove("hidden");
+              setTimeout(() => messageDiv.classList.add("hidden"), 5000);
+            }
+          }
+        });
+      });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
       console.error("Error fetching activities:", error);
@@ -83,6 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities(); // обновить список активностей
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
